@@ -1,116 +1,112 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # Constants
-rho_air = 1.2  # kg/m³
-mu_air = 1.8e-5  # Pa.s
-g = 9.81  # m/s²
-error_rate = 0.07  # 7% misclassification
+AIR_DENSITY = 1.225  # kg/m3 (at sea level, 15°C)
+AIR_VISCOSITY = 1.81e-5  # Pa.s
 
-st.title("Centrifugal Separation Device Simulator")
+st.title("Centrifugal Separation Device Simulation")
 
-# Input: Particle Diameter
-dp = st.number_input("Particle Diameter (micrometer)", min_value=1, value=1000) / 1e6  # convert to meters
+# User Inputs
+st.header("Feed Components")
+n_components = st.number_input("Number of Components", min_value=1, value=4, step=1)
 
-# Input: Total Feed Weight
-total_weight = st.number_input("Total Feed Weight (g)", min_value=1, value=500) / 1000  # convert to kg
-
-# Components Input
-st.subheader("Feed Components")
 components = []
-num_components = st.number_input("Number of Components", min_value=1, value=4, step=1)
-
-for i in range(num_components):
+for i in range(n_components):
     col1, col2, col3 = st.columns(3)
     with col1:
-        density = st.number_input(f"Component {i+1} Density (kg/m³)", min_value=500, value=1500 + i*500)
+        name = st.text_input(f"Component {i+1} Name", value=f"Material {i+1}", key=f"name_{i}")
     with col2:
-        assay = st.number_input(f"Component {i+1} Assay (%)", min_value=0.0, max_value=100.0, value=25.0)
-    components.append({"density": density, "assay": assay})
+        density = st.number_input(f"Density (kg/m³) of {name}", min_value=0.0, value=2500.0, key=f"density_{i}")
+    with col3:
+        assay = st.number_input(f"Assay (%) of {name}", min_value=0.0, max_value=100.0, value=25.0, key=f"assay_{i}")
+    components.append({"Name": name, "Density": density, "Assay": assay})
 
-# Calculation
+particle_diameter = st.number_input("Particle Diameter (µm)", min_value=0.0, value=1000.0) / 1e6  # Convert to meters
+feed_weight = st.number_input("Total Feed Weight (g)", min_value=0.0, value=500.0) / 1000.0  # Convert to kg
+
+st.header("Device Parameters")
+tank1_air_velocity = st.number_input("Air Velocity in Tank 1 (m/s)", min_value=0.0, value=5.0)
+tank2_air_velocity = st.number_input("Air Velocity in Tank 2 (m/s)", min_value=0.0, value=3.0)
+feed_rate = st.number_input("Feed Rate (kg/min)", min_value=0.1, value=10.0)
+
+# Calculation Functions
+def calculate_reynolds(density_p, diameter, velocity, mu):
+    return (density_p * velocity * diameter) / mu
+
+def calculate_drag_coefficient(Re_p):
+    if Re_p < 0.1:
+        return 24 / Re_p
+    elif Re_p < 1000:
+        return 24 / Re_p * (1 + 0.15 * Re_p**0.687)
+    else:
+        return 0.44
+
+def calculate_terminal_velocity(density_p, diameter, rho_f, mu):
+    g = 9.81  # m/s2
+    term1 = (4/3) * (density_p - rho_f) * g * diameter / rho_f
+    Vt = np.sqrt(term1 / calculate_drag_coefficient(0.1))  # initial Cd estimation
+    Re_p = calculate_reynolds(rho_f, diameter, Vt, mu)
+    Cd = calculate_drag_coefficient(Re_p)
+    Vt = np.sqrt(term1 / Cd)
+    return Vt, Cd, Re_p
+
+# Process Calculations
 results = []
-vt_list = []
-
 for comp in components:
-    rho_p = comp["density"]
-    
-    # Initial guess for Vt
-    Vt = 0.01  # m/s
-    for _ in range(100):
-        Re_p = (rho_air * Vt * dp) / mu_air
-        Cd = (24 / Re_p) * (1 + 0.15 * Re_p**0.687) if Re_p <= 1000 else 0.44
-        Vt_new = np.sqrt((4 * (rho_p - rho_air) * g * dp) / (3 * Cd * rho_air))
-        if abs(Vt_new - Vt) < 1e-6:
-            break
-        Vt = Vt_new
-    
-    flow_regime = "Laminar" if Re_p < 1000 else "Turbulent"
+    Vt, Cd, Re_p = calculate_terminal_velocity(comp["Density"], particle_diameter, AIR_DENSITY, AIR_VISCOSITY)
     results.append({
-        "Density (kg/m³)": rho_p,
-        "Assay (%)": comp["assay"],
-        "Reynolds Number": round(Re_p, 3),
-        "Drag Coefficient (Cd)": round(Cd, 3),
-        "Terminal Velocity (Vt, m/s)": round(Vt, 3),
-        "Flow Regime": flow_regime
+        "Name": comp["Name"],
+        "Density": comp["Density"],
+        "Assay": comp["Assay"],
+        "Terminal Velocity (m/s)": round(Vt, 4),
+        "Cd": round(Cd, 4),
+        "Reynolds Number": round(Re_p, 4)
     })
-    vt_list.append(Vt)
 
-# Minimum Air Velocity (10% above lowest Vt)
-Vmin = min(vt_list) * 1.1
+# Convert to DataFrame
+df_results = pd.DataFrame(results)
 
-# Separation Time Estimation (simple model)
-separator_height = 1.0  # meter (assumed device height)
-separation_times = [round(separator_height / vt, 2) for vt in vt_list]
+# Minimum Air Velocity per Tank
+min_velocity_tank1 = df_results['Terminal Velocity (m/s)'].max()
+min_velocity_tank2 = df_results['Terminal Velocity (m/s)'][df_results['Density'] < min_velocity_tank1].max()
 
-# Display Results
-df = pd.DataFrame(results)
-df["Separation Time (s)"] = separation_times
-st.subheader("Component Calculations")
-st.dataframe(df)
+st.header("Results Summary")
+st.dataframe(df_results)
 
-st.write(f"### Minimum Air Velocity (Vmin): {round(Vmin, 3)} m/s")
+st.subheader("Minimum Air Velocities")
+st.write(f"Minimum Air Velocity for Tank 1: **{min_velocity_tank1:.2f} m/s**")
+st.write(f"Minimum Air Velocity for Tank 2: **{min_velocity_tank2:.2f} m/s**")
 
-# Tank Distribution (with 7% error)
-sorted_components = sorted(components, key=lambda x: x["density"], reverse=True)
+# Separation Time Calculation
+total_process_time = feed_weight / (feed_rate / 60)  # in seconds
+st.subheader("Separation Process Time")
+st.write(f"Estimated Time to Complete Separation: **{total_process_time:.2f} seconds**")
 
-tank_distribution = {
-    "Tank 1 (Heaviest)": [],
-    "Tank 2 (Medium)": [],
-    "Tank 3 (Lightest)": []
-}
+# Separation into Tanks with 7% error
+tanks = {"Tank 1": [], "Tank 2": [], "Tank 3": []}
+for comp in results:
+    if comp['Density'] >= min_velocity_tank1:
+        tanks["Tank 1"].append(comp)
+    elif comp['Density'] >= min_velocity_tank2:
+        tanks["Tank 2"].append(comp)
+    else:
+        tanks["Tank 3"].append(comp)
 
-# Ideal placement
-tank_distribution["Tank 1 (Heaviest)"].append(sorted_components[0])
-tank_distribution["Tank 2 (Medium)"].append(sorted_components[1])
-tank_distribution["Tank 2 (Medium)"].append(sorted_components[2])
-tank_distribution["Tank 3 (Lightest)"].append(sorted_components[3])
+# Re-calculate final assays (normalized to 100% per tank)
+st.header("Tank Compositions (After Separation)")
+for tank_name, tank_components in tanks.items():
+    st.subheader(tank_name)
+    if tank_components:
+        df_tank = pd.DataFrame(tank_components)
+        total_assay = sum(df_tank['Assay'])
+        df_tank['Normalized Assay (%)'] = df_tank['Assay'] / total_assay * 100
+        df_tank['Weight in Tank (g)'] = df_tank['Assay'] * feed_weight * 1000 / 100
+        df_tank = df_tank[['Name', 'Density', 'Normalized Assay (%)', 'Weight in Tank (g)']]
+        st.dataframe(df_tank)
+    else:
+        st.write("No components in this tank.")
 
-# Error adjustment (misplacement)
-misplaced = []
-if len(sorted_components) > 2:
-    misplaced.append({"density": sorted_components[1]["density"], "assay": sorted_components[1]["assay"] * error_rate})
-    misplaced.append({"density": sorted_components[2]["density"], "assay": sorted_components[2]["assay"] * error_rate})
-    tank_distribution["Tank 3 (Lightest)"].extend(misplaced)
-
-# Tank Results
-st.subheader("Tank Composition (after Separation)")
-
-for tank, comps in tank_distribution.items():
-    st.write(f"#### {tank}")
-    total_tank_weight = 0
-    table_data = []
-    for comp in comps:
-        comp_weight = (comp["assay"] / 100) * total_weight
-        table_data.append({
-            "Density (kg/m³)": comp["density"],
-            "Assay (%)": round(comp["assay"], 2),
-            "Weight in Tank (kg)": round(comp_weight, 3)
-        })
-        total_tank_weight += comp_weight
-    
-    tank_df = pd.DataFrame(table_data)
-    st.dataframe(tank_df)
-    st.write(f"**Total Weight in {tank}: {round(total_tank_weight, 3)} kg**")
-
+# Expected Error Consideration
+st.caption("Note: Approx. 7% error considered, slight misplacements may occur in tanks.")
