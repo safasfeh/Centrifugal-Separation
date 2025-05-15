@@ -1,41 +1,23 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+from io import BytesIO
+
+st.set_page_config(page_title="Centrifugal Separation Simulator", layout="wide")
+
+st.title("Centrifugal Separation Device Simulator")
 
 # Constants
-AIR_DENSITY = 1.225  # kg/m3 (at sea level, 15°C)
-AIR_VISCOSITY = 1.81e-5  # Pa.s
+rho_air = 1.225  # kg/m3
+mu_air = 1.81e-5  # Pa.s (kg/m.s)
+g = 9.81  # m/s2
 
-st.title("Centrifugal Separation Device Simulation")
+# Helper functions
+def reynolds_number(rho_p, d_p, V):
+    return (rho_air * V * d_p) / mu_air
 
-# User Inputs
-st.header("Feed Components")
-n_components = st.number_input("Number of Components", min_value=1, value=4, step=1)
-
-components = []
-for i in range(n_components):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        name = st.text_input(f"Component {i+1} Name", value=f"Material {i+1}", key=f"name_{i}")
-    with col2:
-        density = st.number_input(f"Density (kg/m³) of {name}", min_value=0.0, value=2500.0, key=f"density_{i}")
-    with col3:
-        assay = st.number_input(f"Assay (%) of {name}", min_value=0.0, max_value=100.0, value=25.0, key=f"assay_{i}")
-    components.append({"Name": name, "Density": density, "Assay": assay})
-
-particle_diameter = st.number_input("Particle Diameter (µm)", min_value=0.0, value=1000.0) / 1e6  # Convert to meters
-feed_weight = st.number_input("Total Feed Weight (g)", min_value=0.0, value=500.0) / 1000.0  # Convert to kg
-
-st.header("Device Parameters")
-tank1_air_velocity = st.number_input("Air Velocity in Tank 1 (m/s)", min_value=0.0, value=5.0)
-tank2_air_velocity = st.number_input("Air Velocity in Tank 2 (m/s)", min_value=0.0, value=3.0)
-feed_rate = st.number_input("Feed Rate (kg/min)", min_value=0.1, value=10.0)
-
-# Calculation Functions
-def calculate_reynolds(density_p, diameter, velocity, mu):
-    return (density_p * velocity * diameter) / mu
-
-def calculate_drag_coefficient(Re_p):
+def drag_coefficient(Re_p):
     if Re_p < 0.1:
         return 24 / Re_p
     elif Re_p < 1000:
@@ -43,70 +25,152 @@ def calculate_drag_coefficient(Re_p):
     else:
         return 0.44
 
-def calculate_terminal_velocity(density_p, diameter, rho_f, mu):
-    g = 9.81  # m/s2
-    term1 = (4/3) * (density_p - rho_f) * g * diameter / rho_f
-    Vt = np.sqrt(term1 / calculate_drag_coefficient(0.1))  # initial Cd estimation
-    Re_p = calculate_reynolds(rho_f, diameter, Vt, mu)
-    Cd = calculate_drag_coefficient(Re_p)
-    Vt = np.sqrt(term1 / Cd)
-    return Vt, Cd, Re_p
+def terminal_velocity(rho_p, d_p):
+    Re_guess = 0.1
+    error = 1e-5
+    for _ in range(100):
+        Cd = drag_coefficient(Re_guess)
+        Vt = np.sqrt((4 * g * d_p * (rho_p - rho_air)) / (3 * Cd * rho_air))
+        Re_new = reynolds_number(rho_p, d_p, Vt)
+        if abs(Re_new - Re_guess) < error:
+            break
+        Re_guess = Re_new
+    return Vt, Re_new, Cd
 
-# Process Calculations
+# Input Section
+st.sidebar.header("Feed Components")
+components = []
+
+num_components = st.sidebar.number_input("Number of Components", min_value=1, max_value=10, value=4)
+
+for i in range(num_components):
+    st.sidebar.subheader(f"Component {i+1}")
+    name = st.sidebar.text_input(f"Name {i+1}", value=f"Component {i+1}")
+    density = st.sidebar.number_input(f"Density (kg/m3) {i+1}", min_value=500, max_value=10000, value=2500, step=50)
+    assay = st.sidebar.number_input(f"Assay (%) {i+1}", min_value=0.0, max_value=100.0, value=25.0, step=1.0)
+    components.append({"Name": name, "Density": density, "Assay (%)": assay})
+
+particle_diameter = st.sidebar.number_input("Particle Diameter (μm)", min_value=10, max_value=5000, value=1000, step=10) / 1e6
+total_feed_weight = st.sidebar.number_input("Total Feed Weight (g)", min_value=10, max_value=5000, value=500, step=10)
+
+# Compute Separation Results
 results = []
 for comp in components:
-    Vt, Cd, Re_p = calculate_terminal_velocity(comp["Density"], particle_diameter, AIR_DENSITY, AIR_VISCOSITY)
+    weight = total_feed_weight * (comp["Assay (%)"] / 100)
+    Vt, Re_p, Cd = terminal_velocity(comp["Density"], particle_diameter)
     results.append({
         "Name": comp["Name"],
-        "Density": comp["Density"],
-        "Assay": comp["Assay"],
-        "Terminal Velocity (m/s)": round(Vt, 4),
-        "Cd": round(Cd, 4),
-        "Reynolds Number": round(Re_p, 4)
+        "Density (kg/m3)": comp["Density"],
+        "Assay (%)": comp["Assay (%)"],
+        "Weight (g)": weight,
+        "Vt (m/s)": Vt,
+        "Re_p": Re_p,
+        "Cd": Cd
     })
 
-# Convert to DataFrame
-df_results = pd.DataFrame(results)
+results_df = pd.DataFrame(results)
 
-# Minimum Air Velocity per Tank
-min_velocity_tank1 = df_results['Terminal Velocity (m/s)'].max()
-min_velocity_tank2 = df_results['Terminal Velocity (m/s)'][df_results['Density'] < min_velocity_tank1].max()
+st.subheader("Calculated Separation Parameters")
+st.dataframe(results_df)
 
-st.header("Results Summary")
-st.dataframe(df_results)
+# Minimum Air Velocity for Tank 1 & 2
+sorted_results = sorted(results, key=lambda x: x["Density (kg/m3)"], reverse=True)
+Vmin_tank1 = sorted_results[0]["Vt (m/s)"] * 1.1  # 10% safety margin
+Vmin_tank2 = sorted_results[2]["Vt (m/s)"] * 1.1  # next cutoff
 
-st.subheader("Minimum Air Velocities")
-st.write(f"Minimum Air Velocity for Tank 1: **{min_velocity_tank1:.2f} m/s**")
-st.write(f"Minimum Air Velocity for Tank 2: **{min_velocity_tank2:.2f} m/s**")
+st.subheader("Minimum Air Velocity (Vmin)")
+st.write(f"Tank 1 Vmin: {Vmin_tank1:.4f} m/s")
+st.write(f"Tank 2 Vmin: {Vmin_tank2:.4f} m/s")
 
-# Separation Time Calculation
-total_process_time = feed_weight / (feed_rate / 60)  # in seconds
-st.subheader("Separation Process Time")
-st.write(f"Estimated Time to Complete Separation: **{total_process_time:.2f} seconds**")
-
-# Separation into Tanks with 7% error
+# Separation Logic with ~7% error overlap
 tanks = {"Tank 1": [], "Tank 2": [], "Tank 3": []}
+
 for comp in results:
-    if comp['Density'] >= min_velocity_tank1:
-        tanks["Tank 1"].append(comp)
-    elif comp['Density'] >= min_velocity_tank2:
-        tanks["Tank 2"].append(comp)
+    rand_val = np.random.rand()
+    if comp["Density (kg/m3)"] >= sorted_results[1]["Density (kg/m3)"]:
+        if rand_val < 0.93:
+            tanks["Tank 1"].append(comp)
+        else:
+            tanks["Tank 2"].append(comp)
+    elif comp["Density (kg/m3)"] >= sorted_results[2]["Density (kg/m3)"]:
+        if rand_val < 0.93:
+            tanks["Tank 2"].append(comp)
+        else:
+            tanks["Tank 3"].append(comp)
     else:
         tanks["Tank 3"].append(comp)
 
-# Re-calculate final assays (normalized to 100% per tank)
-st.header("Tank Compositions (After Separation)")
-for tank_name, tank_components in tanks.items():
-    st.subheader(tank_name)
-    if tank_components:
-        df_tank = pd.DataFrame(tank_components)
-        total_assay = sum(df_tank['Assay'])
-        df_tank['Normalized Assay (%)'] = df_tank['Assay'] / total_assay * 100
-        df_tank['Weight in Tank (g)'] = df_tank['Assay'] * feed_weight * 1000 / 100
-        df_tank = df_tank[['Name', 'Density', 'Normalized Assay (%)', 'Weight in Tank (g)']]
-        st.dataframe(df_tank)
-    else:
-        st.write("No components in this tank.")
+# Final Assay Calculation
+tank_tables = {}
+for tank_name, comps in tanks.items():
+    total_weight = sum([c["Weight (g)"] for c in comps])
+    table = []
+    for c in comps:
+        assay = (c["Weight (g)"] / total_weight * 100) if total_weight else 0
+        table.append({
+            "Name": c["Name"],
+            "Weight (g)": c["Weight (g)"],
+            "Final Assay (%)": assay
+        })
+    tank_tables[tank_name] = pd.DataFrame(table)
 
-# Expected Error Consideration
-st.caption("Note: Approx. 7% error considered, slight misplacements may occur in tanks.")
+# Display Tank Compositions
+st.subheader("Tank Compositions after Separation (Final Assay %)")
+
+cols = st.columns(3)
+for i, (tank_name, df) in enumerate(tank_tables.items()):
+    with cols[i]:
+        st.markdown(f"### {tank_name}")
+        st.dataframe(df)
+
+# Process Time Estimation (Example)
+feed_rate = 50  # grams per minute (adjust as needed)
+process_time = total_feed_weight / feed_rate
+st.subheader("Estimated Process Time")
+st.write(f"Estimated time to finish separation: {process_time:.2f} minutes")
+
+# Sankey Diagram with Hover Tooltips
+labels = ["Feed"] + list(tanks.keys())
+sources, targets, values, custom_labels = [], [], [], []
+
+for i, (tank_name, comps) in enumerate(tanks.items()):
+    tank_weight = sum([c["Weight (g)"] for c in comps])
+    sources.append(0)
+    targets.append(i + 1)
+    values.append(tank_weight)
+    tooltip = "<br>".join([f"{c['Name']}: {c['Weight (g)']:.2f} g" for c in comps])
+    custom_labels.append(tooltip)
+
+fig = go.Figure(data=[go.Sankey(
+    node=dict(
+        pad=15,
+        thickness=20,
+        line=dict(color="black", width=0.5),
+        label=labels,
+        color=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"]
+    ),
+    link=dict(
+        source=sources,
+        target=targets,
+        value=values,
+        customdata=custom_labels,
+        hovertemplate='%{target.label}<br>Total Weight: %{value:.2f} g<br>Components:<br>%{customdata}<extra></extra>',
+        color=["rgba(99,110,250,0.6)", "rgba(239,85,59,0.6)", "rgba(0,204,150,0.6)"]
+    ))])
+
+st.subheader("Separation Flow Visualization (Sankey Diagram)")
+st.plotly_chart(fig, use_container_width=True)
+
+# CSV Export of Final Tank Composition
+st.subheader("Download Tank Compositions")
+
+def convert_df_to_csv():
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        for tank_name, df in tank_tables.items():
+            df.to_excel(writer, sheet_name=tank_name, index=False)
+    output.seek(0)
+    return output
+
+csv_file = convert_df_to_csv()
+st.download_button(label="Download Tank Compositions as Excel", data=csv_file, file_name="tank_compositions.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
