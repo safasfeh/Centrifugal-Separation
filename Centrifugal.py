@@ -5,6 +5,29 @@ import plotly.graph_objects as go
 from io import BytesIO
 
 st.set_page_config(page_title="Centrifugal Separation Simulator", layout="wide")
+# Centered TTU Logo and Header Info
+st.image("ttu_logo.png", width=800)
+st.markdown("""
+    <div style='text-align: center;'>
+        <h3 style='color: green;'>Tafila Technical University</h3>
+        <h4 style='color: green;'>Natural Resources and Chemical Engineering Department</h4>
+        <p><strong>Bachelor's Degree Project</strong></p>
+    </div>
+""", unsafe_allow_html=True)
+
+# Project Info Box
+st.markdown("""
+    <div style='border: 2px solid #ddd; padding: 15px; border-radius: 10px; margin-top: 10px;'>
+        <h2 style='text-align: center;'>Modeling Coagulation–Flocculation with Artificial Neural Networks</h2>
+        <h4 style='text-align: center;'>Operation Parameters Prediction</h4>
+        <br>
+        <p><strong>Students:</strong><br>
+        Shahad Mohammed Abushamma<br>
+        Rahaf Ramzi Al -shakh Qasem<br>
+        Duaa Musa Al-Khalafat</p>
+        <p><strong>Supervisor:</strong> Dr. Ashraf Alsafasfeh</p>
+    </div>
+""", unsafe_allow_html=True)
 
 st.title("Centrifugal Separation Device Simulator")
 
