@@ -20,13 +20,11 @@ st.markdown("""
     <div style='border: 2px solid #ddd; padding: 15px; border-radius: 10px; margin-top: 10px;'>
         <h2 style='text-align: center;'>Centrifugal Separation Device Simulator</h2>
         
-        <br>
-        <p><strong>Students:</strong><br>
-        Ahmad Al-Khalayleh<br>
-        Mohammad Al-Khalayleh<br>
-        Hebatullh Abuabboud<br>
-        Doaa Al-Shoha</p>
-        <p><strong>Supervisor:</strong> Dr. Ashraf Alsafasfeh</p>
+        Ahmad Al-Khalayleh
+        Mohammad Al-Khalayleh
+        Hebatullh Abuabboud
+        Doaa Al-Shoha
+        Supervisor:Dr. Ashraf Alsafasfeh
     </div>
 """, unsafe_allow_html=True)
 
@@ -153,36 +151,39 @@ process_time = total_feed_weight / feed_rate
 st.subheader("Estimated Process Time")
 st.write(f"Estimated time to finish separation: {process_time:.2f} minutes")
 
-# Sankey Diagram with Hover Tooltips
-labels = ["Feed"] + list(tanks.keys())
-sources, targets, values, custom_labels = [], [], [], []
+# Sankey Diagram
+st.subheader("Separation Sankey Diagram")
+labels = [d[0] for d in feed_data] + ["Tank 1", "Tank 2", "Tank 3"]
+source = []
+target = []
+values = []
+hovertexts = []
 
-for i, (tank_name, comps) in enumerate(tanks.items()):
-    tank_weight = sum([c["Weight (g)"] for c in comps])
-    sources.append(0)
-    targets.append(i + 1)
-    values.append(tank_weight)
-    tooltip = "<br>".join([f"{c['Name']}: {c['Weight (g)']:.2f} g" for c in comps])
-    custom_labels.append(tooltip)
+for i, d in enumerate(feed_data):
+    for t in range(1, 4):
+        assay_in_tank = tanks[t].get(d[1], 0)
+        if assay_in_tank > 0:
+            source.append(i)
+            target.append(len(feed_data) + t - 1)
+            values.append(assay_in_tank)
+            hovertexts.append(f"{d[0]} to Tank {t}: {assay_in_tank:.2f}%")
 
-fig = go.Figure(data=[go.Sankey(
+fig = go.Figure(go.Sankey(
     node=dict(
         pad=15,
         thickness=20,
         line=dict(color="black", width=0.5),
         label=labels,
-        color=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"]
     ),
     link=dict(
-        source=sources,
-        target=targets,
+        source=source,
+        target=target,
         value=values,
-        customdata=custom_labels,
-        hovertemplate='%{target.label}<br>Total Weight: %{value:.2f} g<br>Components:<br>%{customdata}<extra></extra>',
-        color=["rgba(99,110,250,0.6)", "rgba(239,85,59,0.6)", "rgba(0,204,150,0.6)"]
-    ))])
+        customdata=hovertexts,
+        hovertemplate="%{customdata}<extra></extra>",
+    )
+))
 
-st.subheader("Separation Flow Visualization (Sankey Diagram)")
 st.plotly_chart(fig, use_container_width=True)
 
 # CSV Export of Final Tank Composition
