@@ -6,7 +6,7 @@ from io import BytesIO
 
 st.set_page_config(page_title="Centrifugal Separation Simulator", layout="wide")
 # Centered TTU Logo and Header Info
-st.image("ttu_logo.png", width=800)
+st.image("ttu_logo_1.png", width=800)
 st.markdown("""
     <div style='text-align: center;'>
         <h3 style='color: blue;'>Tafila Technical University</h3>
