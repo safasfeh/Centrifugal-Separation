@@ -6,7 +6,7 @@ from io import BytesIO
 
 st.set_page_config(page_title="Centrifugal Separation Simulator", layout="wide")
 # Centered TTU Logo and Header Info
-st.image("ttu_logo.png", width=400)
+st.image("ttu_logo.png", width=800)
 st.markdown("""
     <div style='text-align: center;'>
         <h3 style='color: blue;'>Tafila Technical University</h3>
@@ -17,16 +17,20 @@ st.markdown("""
 
 # Project Info Box
 st.markdown("""
-    <div style='border: 2px solid #ddd; padding: 15px; border-radius: 10px; margin-top: 10px;'>
-        <h2 style='text-align: center;'>Centrifugal Separation Device Simulator</h2>
-        
-        Ahmad Al-Khalayleh
-        Mohammad Al-Khalayleh
-        Hebatullh Abuabboud
-        Doaa Al-Shoha
-        Supervisor:Dr. Ashraf Alsafasfeh
+    <div style='border: 2px solid #ddd; padding: 20px; border-radius: 10px; margin-top: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;'>
+        <h2 style='text-align: center; color: #003366;'>Centrifugal Separation Device Simulator</h2>
+        <div style='text-align: center; font-size: 16px; line-height: 1.6;'>
+            <strong>Team Members:</strong><br>
+            Ahmad Al-Khalayleh<br>
+            Mohammad Al-Khalayleh<br>
+            Hebatullh Abuabboud<br>
+            Doaa Al-Shoha<br><br>
+            <strong>Supervisor:</strong><br>
+            Dr. Ashraf Alsafasfeh
+        </div>
     </div>
 """, unsafe_allow_html=True)
+
 
 st.title("Centrifugal Separation Device Simulator")
 
