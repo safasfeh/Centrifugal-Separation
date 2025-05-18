@@ -150,23 +150,26 @@ feed_rate = 50  # grams per minute (adjust as needed)
 process_time = total_feed_weight / feed_rate
 st.subheader("Estimated Process Time")
 st.write(f"Estimated time to finish separation: {process_time:.2f} minutes")
-
 # Sankey Diagram
 st.subheader("Separation Sankey Diagram")
-labels = [d[0] for d in feed_data] + ["Tank 1", "Tank 2", "Tank 3"]
+
+# Use component names from the results
+labels = [comp["Name"] for comp in results] + ["Tank 1", "Tank 2", "Tank 3"]
 source = []
 target = []
 values = []
 hovertexts = []
 
-for i, d in enumerate(feed_data):
-    for t in range(1, 4):
-        assay_in_tank = tanks[t].get(d[1], 0)
-        if assay_in_tank > 0:
-            source.append(i)
-            target.append(len(feed_data) + t - 1)
-            values.append(assay_in_tank)
-            hovertexts.append(f"{d[0]} to Tank {t}: {assay_in_tank:.2f}%")
+# Build the flows from components to tanks
+for i, comp in enumerate(results):
+    for j, tank_name in enumerate(["Tank 1", "Tank 2", "Tank 3"]):
+        # Check if this component is in the tank
+        for c in tanks[tank_name]:
+            if c["Name"] == comp["Name"]:
+                source.append(i)
+                target.append(len(results) + j)
+                values.append(c["Weight (g)"])
+                hovertexts.append(f"{c['Name']} to {tank_name}: {c['Weight (g)']:.2f} g")
 
 fig = go.Figure(go.Sankey(
     node=dict(
@@ -185,6 +188,7 @@ fig = go.Figure(go.Sankey(
 ))
 
 st.plotly_chart(fig, use_container_width=True)
+
 
 # CSV Export of Final Tank Composition
 st.subheader("Download Tank Compositions")
