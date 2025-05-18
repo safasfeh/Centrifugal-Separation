@@ -105,22 +105,42 @@ st.write(f"Tank 1 Vmin: {Vmin_tank1:.4f} m/s")
 st.write(f"Tank 2 Vmin: {Vmin_tank2:.4f} m/s")
 
 # Separation Logic with ~7% error overlap
+# Step 1: Sort by density
+sorted_results = sorted(results, key=lambda x: x["Density (kg/m3)"], reverse=True)
+n = len(sorted_results)
+group_size = n // 3
+remainder = n % 3
+
+# Step 2: Assign ideal tank groupings
+ideal_tanks = {}
+for idx, comp in enumerate(sorted_results):
+    if idx < group_size + (1 if remainder > 0 else 0):
+        ideal_tanks[comp["Name"]] = "Tank 1"
+    elif idx < 2 * group_size + (1 if remainder > 1 else 0):
+        ideal_tanks[comp["Name"]] = "Tank 2"
+    else:
+        ideal_tanks[comp["Name"]] = "Tank 3"
+
+# Step 3: Apply separation logic with 7% error
 tanks = {"Tank 1": [], "Tank 2": [], "Tank 3": []}
 
+tank_order = ["Tank 1", "Tank 2", "Tank 3"]
 for comp in results:
+    ideal_tank = ideal_tanks[comp["Name"]]
+    ideal_index = tank_order.index(ideal_tank)
+
     rand_val = np.random.rand()
-    if comp["Density (kg/m3)"] >= sorted_results[1]["Density (kg/m3)"]:
-        if rand_val < 0.93:
-            tanks["Tank 1"].append(comp)
-        else:
-            tanks["Tank 2"].append(comp)
-    elif comp["Density (kg/m3)"] >= sorted_results[2]["Density (kg/m3)"]:
-        if rand_val < 0.93:
-            tanks["Tank 2"].append(comp)
-        else:
-            tanks["Tank 3"].append(comp)
+    if rand_val < 0.93:
+        assigned_tank = ideal_tank
     else:
-        tanks["Tank 3"].append(comp)
+        # Error shift: move to adjacent tank
+        if ideal_index == 0:
+            assigned_tank = "Tank 2"
+        elif ideal_index == 2:
+            assigned_tank = "Tank 2"
+        else:
+            assigned_tank = np.random.choice(["Tank 1", "Tank 3"])
+    tanks[assigned_tank].append(comp)
 
 # Final Assay Calculation
 tank_tables = {}
