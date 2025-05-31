@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from io import BytesIO
 
 st.set_page_config(page_title="Centrifugal Separation Simulator", layout="wide")
-# Centered TTU Logo and Header Info
+# Centered TTU Logo and Header Information
 st.image("ttu_logo_1.png", width=800)
 st.markdown("""
     <div style='text-align: center;'>
