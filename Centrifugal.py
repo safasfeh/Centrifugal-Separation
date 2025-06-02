@@ -32,7 +32,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-st.title("Centrifugal Separation Device Simulator")
+st.title("Tri-Sep-FS Simulator")
 
 # Constants
 rho_air = 1.225  # kg/m3
