@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 from io import BytesIO
 
-st.set_page_config(page_title="Centrifugal Separation Simulator", layout="wide")
+st.set_page_config(page_title="Tri-Sep-FS Simulator", layout="wide")
 # Centered TTU Logo and Header Information
 st.image("ttu_logo_1.png", width=800)
 st.markdown("""
@@ -18,11 +18,11 @@ st.markdown("""
 # Project Info Box
 st.markdown("""
     <div style='border: 2px solid #ddd; padding: 20px; border-radius: 10px; margin-top: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;'>
-        <h2 style='text-align: center; color: #003366;'>Centrifugal Separation Device Simulator</h2>
+        <h2 style='text-align: center; color: #003366;'>Tri-Sep-FS Simulator</h2>
         <div style='text-align: center; font-size: 16px; line-height: 1.6;'>
             <strong>Team Members:</strong><br>
-            Ahmad Al-Khalayleh<br>
-            Mohammad Al-Khalayleh<br>
+            Ahmed Al-Khalaileh<br>
+            Mohammad Al-Khalaileh<br>
             Hebatullh Abuabboud<br>
             Doaa Al-Shoha<br><br>
             <strong>Supervisor:</strong><br>
